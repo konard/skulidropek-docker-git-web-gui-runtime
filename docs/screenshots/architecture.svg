@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 540" font-family="Inter, system-ui, sans-serif" font-size="13">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#475569"/>
+    </marker>
+    <linearGradient id="orch" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#fef3c7"/>
+      <stop offset="100%" stop-color="#fde68a"/>
+    </linearGradient>
+    <linearGradient id="ctn" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#dbeafe"/>
+      <stop offset="100%" stop-color="#bfdbfe"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="880" height="540" fill="#f8fafc"/>
+  <text x="440" y="32" text-anchor="middle" font-size="20" font-weight="600" fill="#0f172a">Web-X11 Container Runtime — MVP architecture</text>
+
+  <!-- Browser -->
+  <rect x="40" y="80" width="180" height="80" rx="10" fill="#fff" stroke="#94a3b8"/>
+  <text x="130" y="115" text-anchor="middle" font-weight="600" fill="#0f172a">Browser</text>
+  <text x="130" y="138" text-anchor="middle" fill="#475569">noVNC viewer</text>
+
+  <!-- Orchestrator -->
+  <rect x="290" y="60" width="300" height="200" rx="12" fill="url(#orch)" stroke="#d97706" stroke-width="1.5"/>
+  <text x="440" y="85" text-anchor="middle" font-weight="600" fill="#7c2d12">Orchestrator (Effect-TS, Node)</text>
+
+  <rect x="310" y="100" width="120" height="40" rx="6" fill="#fff" stroke="#d97706"/>
+  <text x="370" y="124" text-anchor="middle" fill="#7c2d12">/api/sessions</text>
+
+  <rect x="450" y="100" width="120" height="40" rx="6" fill="#fff" stroke="#d97706"/>
+  <text x="510" y="124" text-anchor="middle" fill="#7c2d12">/b/&lt;id&gt;/*</text>
+
+  <rect x="310" y="160" width="260" height="40" rx="6" fill="#fff" stroke="#d97706"/>
+  <text x="440" y="184" text-anchor="middle" fill="#7c2d12">SessionManager · SessionStore (Ref)</text>
+
+  <rect x="310" y="210" width="260" height="40" rx="6" fill="#fff" stroke="#d97706"/>
+  <text x="440" y="234" text-anchor="middle" fill="#7c2d12">Docker (CLI exec) · Clock · IdGen</text>
+
+  <!-- Container 1 -->
+  <rect x="640" y="80" width="200" height="180" rx="12" fill="url(#ctn)" stroke="#1d4ed8" stroke-width="1.5"/>
+  <text x="740" y="105" text-anchor="middle" font-weight="600" fill="#1e3a8a">webx11-&lt;id&gt; container</text>
+  <text x="740" y="135" text-anchor="middle" fill="#1e3a8a">Xvfb :99</text>
+  <text x="740" y="155" text-anchor="middle" fill="#1e3a8a">openbox WM</text>
+  <text x="740" y="175" text-anchor="middle" fill="#1e3a8a">x11vnc — localhost only</text>
+  <text x="740" y="195" text-anchor="middle" fill="#1e3a8a">websockify · noVNC :6080</text>
+  <text x="740" y="220" text-anchor="middle" fill="#1e3a8a">$START_APP</text>
+  <text x="740" y="248" text-anchor="middle" font-size="11" fill="#475569">cap-drop ALL · no-new-privileges</text>
+
+  <!-- Container 2 (faded) -->
+  <rect x="640" y="290" width="200" height="100" rx="12" fill="url(#ctn)" stroke="#1d4ed8" stroke-width="1.5" opacity="0.55"/>
+  <text x="740" y="315" text-anchor="middle" font-weight="600" fill="#1e3a8a" opacity="0.85">webx11-&lt;id&gt; container</text>
+  <text x="740" y="345" text-anchor="middle" fill="#1e3a8a" opacity="0.85">… one per session …</text>
+
+  <!-- Arrows -->
+  <line x1="220" y1="120" x2="290" y2="120" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="255" y="110" text-anchor="middle" fill="#475569" font-size="11">HTTP / WS</text>
+
+  <line x1="590" y1="120" x2="640" y2="120" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="590" y1="220" x2="640" y2="320" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="615" y="270" text-anchor="middle" fill="#475569" font-size="11">docker run/stop/rm/logs</text>
+
+  <!-- Footer -->
+  <rect x="40" y="430" width="800" height="80" rx="10" fill="#fff" stroke="#cbd5e1"/>
+  <text x="60" y="455" font-weight="600" fill="#0f172a">URL contract (ТЗ §9)</text>
+  <text x="60" y="478" fill="#334155">Control plane: POST /api/sessions · GET /api/sessions[/:id][/logs] · POST /api/sessions/:id/stop · DELETE /api/sessions/:id</text>
+  <text x="60" y="497" fill="#334155">Viewer:        GET /b/&lt;session_id&gt;/vnc.html?autoconnect=true&amp;resize=remote&amp;path=b%2F&lt;session_id&gt;%2Fwebsockify</text>
+</svg>
