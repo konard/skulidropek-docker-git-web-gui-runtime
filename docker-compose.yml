@@ -1,0 +1,23 @@
+# QUOTE(TZ): "Минимальный docker-compose для MVP"
+# REF: issue#1 section 17
+services:
+  webx11-session:
+    build:
+      context: ./docker
+    image: webx11-runtime:latest
+    container_name: webx11-session-test
+    ports:
+      - "6080:6080"
+    environment:
+      DISPLAY: ":99"
+      SCREEN_WIDTH: "1280"
+      SCREEN_HEIGHT: "720"
+      SCREEN_DEPTH: "24"
+      START_APP: "xterm"
+    shm_size: "1gb"
+    mem_limit: "2g"
+    cpus: 2
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
