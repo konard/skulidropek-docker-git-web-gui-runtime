@@ -44,9 +44,9 @@ default app is `xterm`; change it via `START_APP` in `docker-compose.yml`.
 
 ```sh
 cd packages/app
-pnpm install
-pnpm run build
-PORT=8080 pnpm run start
+corepack pnpm install
+corepack pnpm run build
+PORT=8080 corepack pnpm run start
 ```
 
 Then create a session and open the viewer URL the API returns:
@@ -63,6 +63,26 @@ curl -sX POST http://localhost:8080/api/sessions \
     "ttlSeconds": 3600
   }'
 # → { "id": "...", "viewer_url": "/b/<id>/vnc.html?autoconnect=true&...", ... }
+```
+
+### Real Docker/browser proof
+
+The PR proof below was captured against a real Docker session, not the fake
+Docker layer used by unit tests:
+
+![Real orchestrator API response](docs/screenshots/real-orchestrator-api.png)
+
+![Real container runtime logs](docs/screenshots/real-docker-logs.png)
+
+![noVNC connected through the orchestrator gateway](docs/screenshots/real-orchestrator-novnc.png)
+
+To reproduce the same flow locally:
+
+```sh
+packages/app/experiments/real-e2e.sh
+
+# keep the server/session alive for manual browser screenshots
+KEEP_ALIVE=1 packages/app/experiments/real-e2e.sh
 ```
 
 ## REST API
@@ -98,7 +118,7 @@ test in `packages/app/tests/core/session/docker-args.test.ts`.
 cd packages/app
 pnpm run lint        # vibecode-linter (eslint + biome + tsc + jscpd) on src/
 pnpm run lint:tests  # same on tests/
-pnpm run test        # 108 vitest cases, CORE pure + SHELL with fake Docker
+pnpm run test        # 110 vitest cases, CORE pure + SHELL with fake Docker
 pnpm run typecheck   # tsc --noEmit
 ```
 
@@ -115,6 +135,6 @@ packages/app/
     shell/http/             ← /api/* + /b/<id>/* routers, server wiring
     app/main.ts             ← Layer composition + NodeRuntime entry point
   tests/
-    core/                   ← pure tests (108-test suite)
+    core/                   ← pure tests
     shell/                  ← integration tests with fake Docker
 ```

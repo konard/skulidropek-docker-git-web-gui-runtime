@@ -41,7 +41,12 @@ export const createOp = (
     const starting = yield* _(transitionAndStore(deps, initial, { _tag: "Start" }))
     const argv = buildDockerRunArgs(starting, port, {})
     const containerId = yield* _(deps.docker.run(argv))
-    const withContainer = { ...starting, containerId }
+    const novncHost = yield* _(
+      deps.docker.inspectIp(containerId).pipe(
+        Effect.tapError(() => deps.docker.rm(containerId).pipe(Effect.ignore))
+      )
+    )
+    const withContainer = { ...starting, containerId, novncHost }
     yield* _(deps.store.put(withContainer))
     return yield* _(transitionAndStore(deps, withContainer, { _tag: "MarkReady" }))
   })

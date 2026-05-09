@@ -28,6 +28,7 @@ export const makeSessionFixture = (overrides: Partial<Session> = {}): Session =>
   app: "/usr/bin/xterm",
   status: "READY",
   containerId: FIXED_CONTAINER,
+  novncHost: "127.0.0.1",
   novncPort: 16_080,
   resolution: { width: 1280, height: 720, depth: 24 },
   resources: { cpus: 1, memoryMb: 1024, shmMb: 256 },

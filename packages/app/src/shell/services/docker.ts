@@ -19,6 +19,7 @@ export class DockerError extends Data.TaggedError("DockerError")<{
 
 export interface Docker {
   readonly run: (args: ReadonlyArray<string>) => Effect.Effect<ContainerId, DockerError>
+  readonly inspectIp: (id: ContainerId) => Effect.Effect<string, DockerError>
   readonly stop: (id: ContainerId) => Effect.Effect<void, DockerError>
   readonly rm: (id: ContainerId) => Effect.Effect<void, DockerError>
   readonly logs: (id: ContainerId) => Effect.Effect<ReadonlyArray<string>, DockerError>
@@ -41,6 +42,13 @@ const parseContainerId = (raw: string): Effect.Effect<ContainerId, DockerError> 
     catch: (err) => new DockerError({ stage: "run", cause: String(err) })
   })
 
+const parseContainerIp = (raw: string): Effect.Effect<string, DockerError> => {
+  const ip = raw.trim()
+  return ip.length === 0
+    ? Effect.fail(new DockerError({ stage: "inspect", cause: "container IP is empty" }))
+    : Effect.succeed(ip)
+}
+
 const splitLines = (out: string): ReadonlyArray<string> =>
   out.split("\n").map((s) => s.trim()).filter((l) => l.length > 0)
 
@@ -50,6 +58,9 @@ const liveDocker: Effect.Effect<Docker, never, CommandExecutor.CommandExecutor> 
       Effect.provideService(eff, CommandExecutor.CommandExecutor, executor)
     return {
       run: (args) => provide(runCli("run", args).pipe(Effect.flatMap((raw) => parseContainerId(raw)))),
+      inspectIp: (id) =>
+        provide(runCli("inspect", ["inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", id]))
+          .pipe(Effect.flatMap((raw) => parseContainerIp(raw))),
       stop: (id) => Effect.asVoid(provide(runCli("stop", ["stop", id]))),
       rm: (id) => Effect.asVoid(provide(runCli("rm", ["rm", "-f", id]))),
       logs: (id) =>

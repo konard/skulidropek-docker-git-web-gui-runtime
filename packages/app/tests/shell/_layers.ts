@@ -16,12 +16,13 @@ import { FIXED_CONTAINER, FIXED_ID, FIXED_NOW } from "../_fixtures.js"
 
 export interface DockerCalls {
   readonly run: ReadonlyArray<ReadonlyArray<string>>
+  readonly inspectIp: ReadonlyArray<string>
   readonly stop: ReadonlyArray<string>
   readonly rm: ReadonlyArray<string>
   readonly logs: ReadonlyArray<string>
 }
 
-export const emptyCalls: DockerCalls = { run: [], stop: [], rm: [], logs: [] }
+export const emptyCalls: DockerCalls = { run: [], inspectIp: [], stop: [], rm: [], logs: [] }
 
 export const makeFakeDocker = (
   callsRef: Ref.Ref<DockerCalls>,
@@ -30,6 +31,10 @@ export const makeFakeDocker = (
   run: (args) =>
     Ref.update(callsRef, (c) => ({ ...c, run: [...c.run, args] })).pipe(
       Effect.zipRight(Effect.succeed(ContainerId(FIXED_CONTAINER)))
+    ),
+  inspectIp: (id) =>
+    Ref.update(callsRef, (c) => ({ ...c, inspectIp: [...c.inspectIp, id] })).pipe(
+      Effect.zipRight(Effect.succeed("127.0.0.1"))
     ),
   stop: (id) => Ref.update(callsRef, (c) => ({ ...c, stop: [...c.stop, id] })),
   rm: (id) => Ref.update(callsRef, (c) => ({ ...c, rm: [...c.rm, id] })),

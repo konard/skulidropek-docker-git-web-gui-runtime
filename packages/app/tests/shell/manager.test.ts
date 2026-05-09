@@ -60,8 +60,10 @@ describe("SessionManager.create", () => {
     runWithCalls((m) => m.create(baseInput)).then(({ calls, result }) => {
       expect(result.status).toBe("READY")
       expect(result.containerId).toBe(FIXED_CONTAINER)
+      expect(result.novncHost).toBe("127.0.0.1")
       expect(result.id).toBe(FIXED_ID)
       expect(calls.run).toHaveLength(1)
+      expect(calls.inspectIp).toEqual([FIXED_CONTAINER])
       expect(calls.run[0]?.[0]).toBe("run")
     }))
 

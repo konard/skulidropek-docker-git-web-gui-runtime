@@ -6,7 +6,7 @@
 // EFFECT: Effect<never, ServeError | ConfigError, never> at runtime
 // INVARIANT: process exits cleanly on SIGINT/SIGTERM via NodeRuntime.runMain
 // COMPLEXITY: O(1)/O(1)
-import { NodeContext, NodeHttpClient, NodeHttpServer, NodeRuntime } from "@effect/platform-node"
+import { NodeContext, NodeHttpClient, NodeHttpServer, NodeRuntime, NodeSocket } from "@effect/platform-node"
 import { Layer } from "effect"
 import { createServer } from "node:http"
 
@@ -33,6 +33,7 @@ const ManagerLayer = SessionManagerLayer.pipe(Layer.provide(ServicesLayer))
 const AppLayer = serverLayer.pipe(
   Layer.provide(HttpLayer),
   Layer.provide(NodeHttpClient.layer),
+  Layer.provide(NodeSocket.layerWebSocketConstructor),
   Layer.provide(ManagerLayer),
   Layer.provide(NodeContext.layer)
 )

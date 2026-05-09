@@ -40,6 +40,7 @@ export const createSession = (
   app: input.app,
   status: "CREATED",
   containerId: null,
+  novncHost: null,
   novncPort: ctx.novncPort,
   resolution: input.resolution,
   resources: input.resources,

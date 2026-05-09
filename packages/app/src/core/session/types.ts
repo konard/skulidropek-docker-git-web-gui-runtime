@@ -63,6 +63,7 @@ export interface Session {
   readonly app: string
   readonly status: SessionStatus
   readonly containerId: ContainerId | null
+  readonly novncHost: string | null
   readonly novncPort: number
   readonly resolution: Resolution
   readonly resources: Resources

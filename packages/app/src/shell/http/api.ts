@@ -105,9 +105,14 @@ const remove = HttpRouter.del(
   handleSessionResult(withIdAndManager((m, id) => m.remove(id).pipe(Effect.flatMap((s) => okJson(toDto(s))))))
 )
 
+const stop = HttpRouter.post(
+  "/api/sessions/:id/stop",
+  handleSessionResult(withIdAndManager((m, id) => m.stop(id).pipe(Effect.flatMap((s) => okJson(toDto(s))))))
+)
+
 const logs = HttpRouter.get(
   "/api/sessions/:id/logs",
   handleSessionResult(withIdAndManager((m, id) => m.logs(id).pipe(Effect.flatMap((lines) => okJson({ lines })))))
 )
 
-export const apiRouter = HttpRouter.empty.pipe(post, list, get, remove, logs)
+export const apiRouter = HttpRouter.empty.pipe(post, list, get, stop, remove, logs)

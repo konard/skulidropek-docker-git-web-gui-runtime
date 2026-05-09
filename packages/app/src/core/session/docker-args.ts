@@ -9,13 +9,14 @@ import type { Session } from "./types.js"
 
 type ReadonlyRecord<K extends string, V> = { readonly [P in K]: V }
 
+const CONTAINER_NOVNC_PORT = 6080
 const PIDS_LIMIT = 512
 
 /**
- * Compose the argv for `docker run -d --rm ...` that starts a session container.
+ * Compose the argv for `docker run -d ...` that starts a session container.
  *
  * @param session - validated session record
- * @param hostPort - host-side TCP port that maps to the container's noVNC port
+ * @param hostPort - host-side TCP port that maps to the container's fixed noVNC port
  * @param labels - extra docker labels (e.g. owner)
  * @returns argv excluding the leading "docker" command name
  *
@@ -29,17 +30,18 @@ export const buildDockerRunArgs = (
 ): ReadonlyArray<string> => [
   "run",
   "-d",
-  "--rm",
   "--name",
   `webx11-${session.id}`,
   "-p",
-  `${hostPort}:${session.novncPort}`,
+  `${hostPort}:${CONTAINER_NOVNC_PORT}`,
   "-e",
   `SCREEN_WIDTH=${session.resolution.width}`,
   "-e",
   `SCREEN_HEIGHT=${session.resolution.height}`,
   "-e",
   `SCREEN_DEPTH=${session.resolution.depth}`,
+  "-e",
+  `NOVNC_PORT=${CONTAINER_NOVNC_PORT}`,
   "-e",
   `START_APP=${session.app}`,
   "--shm-size",
@@ -66,7 +68,8 @@ const formatLabels = (
     "webx11.session_id": session.id,
     "webx11.created_at": session.createdAt.toISOString(),
     "webx11.expires_at": session.expiresAt.toISOString(),
-    "webx11.port": `${session.novncPort}`,
+    "webx11.container_novnc_port": `${CONTAINER_NOVNC_PORT}`,
+    "webx11.host_novnc_port": `${session.novncPort}`,
     "webx11.status": session.status.toLowerCase()
   }
   return [

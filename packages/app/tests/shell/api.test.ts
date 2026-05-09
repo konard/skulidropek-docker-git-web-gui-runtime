@@ -42,6 +42,9 @@ const post = (body: object) =>
     )
   )
 
+const postPath = (path: string) =>
+  Effect.promise(() => app.handler(new Request(`https://t${path}`, { method: "POST" })))
+
 const get = (path: string) => Effect.promise(() => app.handler(new Request(`https://t${path}`)))
 const del = (path: string) => Effect.promise(() => app.handler(new Request(`https://t${path}`, { method: "DELETE" })))
 
@@ -119,6 +122,21 @@ describe("GET /api/sessions/:id/logs", () => {
 })
 
 describe("DELETE /api/sessions/:id", () => {
+  it("allows stop before delete", () =>
+    Effect.runPromise(
+      Effect.gen(function*(_) {
+        const created = yield* _(createSession)
+        const stopped = yield* _(postPath(`/api/sessions/${created.id}/stop`))
+        expect(stopped.status).toBe(200)
+        const stoppedDto = yield* _(readJson<SessionDto>(stopped))
+        expect(stoppedDto.status).toBe("STOPPED")
+        const removed = yield* _(del(`/api/sessions/${created.id}`))
+        expect(removed.status).toBe(200)
+        const removedDto = yield* _(readJson<SessionDto>(removed))
+        expect(removedDto.status).toBe("DELETED")
+      })
+    ))
+
   it("returns 409 when called on a READY session (must stop first)", () =>
     Effect.runPromise(
       Effect.gen(function*(_) {

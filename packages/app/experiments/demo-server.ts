@@ -3,7 +3,7 @@
 // REF: issue#1 sections 8, 9, 12; PR#2 reviewer request for "пруфы что она реально работает"
 // PURITY: SHELL (experiments)
 // EFFECT: starts a Node HTTP server bound to PORT (default 8080)
-import { NodeContext, NodeHttpClient, NodeHttpServer, NodeRuntime } from "@effect/platform-node"
+import { NodeContext, NodeHttpClient, NodeHttpServer, NodeRuntime, NodeSocket } from "@effect/platform-node"
 import { Effect, Layer, Ref } from "effect"
 import { createServer } from "node:http"
 
@@ -26,6 +26,7 @@ const fakeDockerLayer = Layer.effect(
         Ref.updateAndGet(counter, (n) => n + 1).pipe(
           Effect.map((n) => ContainerId(`fake-container-${n.toString().padStart(12, "0")}`))
         ),
+      inspectIp: () => Effect.succeed("127.0.0.1"),
       stop: () => Effect.void,
       rm: () => Effect.void,
       logs: () => Effect.succeed<ReadonlyArray<string>>([
@@ -55,6 +56,7 @@ const ManagerLayer = SessionManagerLayer.pipe(Layer.provide(ServicesLayer))
 const AppLayer = serverLayer.pipe(
   Layer.provide(HttpLayer),
   Layer.provide(NodeHttpClient.layer),
+  Layer.provide(NodeSocket.layerWebSocketConstructor),
   Layer.provide(ManagerLayer),
   Layer.provide(NodeContext.layer)
 )

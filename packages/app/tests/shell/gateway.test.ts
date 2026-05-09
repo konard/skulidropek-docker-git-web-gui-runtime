@@ -5,6 +5,7 @@
 // INVARIANT: matched id → upstream body returned; unknown id → 404
 // COMPLEXITY: O(1) per request
 import { HttpApp, HttpClient, HttpClientResponse } from "@effect/platform"
+import { NodeSocket } from "@effect/platform-node"
 import { Effect, Layer } from "effect"
 import { afterAll, describe, expect, it } from "vitest"
 
@@ -13,17 +14,25 @@ import { gatewayRouter } from "../../src/shell/http/gateway.js"
 import { FIXED_ID, validCreatePayload } from "../_fixtures.js"
 import { makeFreshManagerLayer } from "./_layers.js"
 
-const fakeClient = HttpClient.make((request) =>
-  Effect.succeed(
+const binaryPayload = new Uint8Array([0, 255, 12, 128])
+
+const fakeClient = HttpClient.make((request) => {
+  const response = request.url.endsWith("/asset.bin")
+    ? new Response(binaryPayload, {
+      status: 200,
+      headers: { "content-type": "application/octet-stream" }
+    })
+    : new Response(`proxied:${request.url}`, {
+      status: 200,
+      headers: { "content-type": "text/plain" }
+    })
+  return Effect.succeed(
     HttpClientResponse.fromWeb(
       request,
-      new Response(`proxied:${request.url}`, {
-        status: 200,
-        headers: { "content-type": "text/plain" }
-      })
+      response
     )
   )
-)
+})
 const httpClientLayer = Layer.succeed(HttpClient.HttpClient, fakeClient)
 
 const managerLayer = makeFreshManagerLayer()
@@ -31,7 +40,7 @@ const memoMap = Effect.runSync(Layer.makeMemoMap)
 const apiHandler = HttpApp.toWebHandlerLayer(apiRouter, managerLayer, { memoMap })
 const gwHandler = HttpApp.toWebHandlerLayer(
   gatewayRouter,
-  Layer.mergeAll(managerLayer, httpClientLayer),
+  Layer.mergeAll(managerLayer, httpClientLayer, NodeSocket.layerWebSocketConstructor),
   { memoMap }
 )
 
@@ -57,6 +66,8 @@ const post = (path: string, body: object) =>
 const gwGet = (path: string) => Effect.promise(() => gwHandler.handler(new Request(`https://t${path}`)))
 
 const readText = (res: Response) => Effect.promise(() => res.text())
+const readBytes = (res: Response) =>
+  Effect.promise(() => res.arrayBuffer()).pipe(Effect.map((buf) => [...new Uint8Array(buf)]))
 
 describe("GET /b/<id>/<sub>", () => {
   it("proxies to the upstream and returns its body", () =>
@@ -76,6 +87,17 @@ describe("GET /b/<id>/<sub>", () => {
       Effect.gen(function*(_) {
         const res = yield* _(gwGet("/b/ffffffffffff/vnc.html"))
         expect(res.status).toBe(404)
+      })
+    ))
+
+  it("proxies binary upstream bodies without text conversion", () =>
+    Effect.runPromise(
+      Effect.gen(function*(_) {
+        yield* _(post("/api/sessions", validCreatePayload))
+        const res = yield* _(gwGet(`/b/${FIXED_ID}/asset.bin`))
+        expect(res.status).toBe(200)
+        const bytes = yield* _(readBytes(res))
+        expect(bytes).toEqual([...binaryPayload])
       })
     ))
 

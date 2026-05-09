@@ -15,7 +15,7 @@ const session: Session = makeSessionFixture({
   id: SessionId("4b618726aef0"),
   status: "STARTING",
   containerId: null,
-  novncPort: 6080,
+  novncPort: 16_080,
   resources: { cpus: 2, memoryMb: 2048, shmMb: 1024 }
 })
 
@@ -58,7 +58,7 @@ describe("buildDockerRunArgs — security hardening", () => {
 })
 
 describe("buildDockerRunArgs — port mapping and resources", () => {
-  it("maps host port → container novnc port", () => {
+  it("maps host port → fixed container novnc port", () => {
     const argv = argvOf()
     const idx = argv.indexOf("-p")
     expect(argv[idx + 1]).toBe("16080:6080")
@@ -69,6 +69,7 @@ describe("buildDockerRunArgs — port mapping and resources", () => {
     expect(argv).toContain("SCREEN_WIDTH=1280")
     expect(argv).toContain("SCREEN_HEIGHT=720")
     expect(argv).toContain("SCREEN_DEPTH=24")
+    expect(argv).toContain("NOVNC_PORT=6080")
     expect(argv).toContain("START_APP=/usr/bin/xterm")
   })
 
@@ -79,11 +80,11 @@ describe("buildDockerRunArgs — port mapping and resources", () => {
     expect(argv[argv.indexOf("--shm-size") + 1]).toBe("1024m")
   })
 
-  it("starts with run -d --rm and ends with the image", () => {
+  it("starts detached and ends with the image", () => {
     const argv = argvOf()
     expect(argv[0]).toBe("run")
     expect(argv[1]).toBe("-d")
-    expect(argv[2]).toBe("--rm")
+    expect(argv).not.toContain("--rm")
     expect(argv.at(-1)).toBe(session.image)
   })
 
@@ -98,7 +99,8 @@ describe("buildDockerRunArgs — labels", () => {
   it("emits builtin webx11.* labels", () => {
     const argv = argvOf()
     expect(argv).toContain(`webx11.session_id=${session.id}`)
-    expect(argv).toContain(`webx11.port=6080`)
+    expect(argv).toContain("webx11.container_novnc_port=6080")
+    expect(argv).toContain("webx11.host_novnc_port=16080")
     expect(argv).toContain(`webx11.status=starting`)
   })
 
