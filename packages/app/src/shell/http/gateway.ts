@@ -12,7 +12,6 @@ import { Effect } from "effect"
 import { parseGatewayPath } from "../../core/gateway/path.js"
 import type { Session } from "../../core/session/types.js"
 import { SessionManagerTag } from "../services/manager.js"
-import type { SessionNotFound } from "../services/store.js"
 import { errorJson } from "./responses.js"
 
 const stripLeadingSlash = (s: string): string => s.startsWith("/") ? s.slice(1) : s
@@ -27,11 +26,7 @@ const proxy = Effect.gen(function*(_) {
   const route = parseGatewayPath(req.url.split("?")[0] ?? req.url)
   if (route._tag === "None") return yield* _(errorJson(404, "not a /b/<id>/ route"))
   const manager = yield* _(SessionManagerTag)
-  const session = yield* _(
-    manager.get(route.value.sessionId).pipe(
-      Effect.catchTag("SessionNotFound", (e: SessionNotFound) => Effect.fail(e))
-    )
-  )
+  const session = yield* _(manager.get(route.value.sessionId))
   const search = req.url.includes("?") ? `?${req.url.split("?", 2)[1] ?? ""}` : ""
   const url = upstreamUrl(session, route.value.subPath, search)
   const client = yield* _(HttpClient.HttpClient)
@@ -42,8 +37,11 @@ const proxy = Effect.gen(function*(_) {
     contentType: response.headers["content-type"] ?? "application/octet-stream"
   })
 }).pipe(
-  Effect.catchTag("SessionNotFound", () => errorJson(404, "session not found")),
-  Effect.catchAll(() => errorJson(502, "upstream proxy error"))
+  Effect.catchTags({
+    SessionNotFound: () => errorJson(404, "session not found"),
+    RequestError: () => errorJson(502, "upstream proxy error"),
+    ResponseError: () => errorJson(502, "upstream proxy error")
+  })
 )
 
 export const gatewayRouter = HttpRouter.empty.pipe(

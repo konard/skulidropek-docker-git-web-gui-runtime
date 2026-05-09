@@ -13,11 +13,10 @@ import { Effect, Match } from "effect"
 import { toDto } from "../../core/session/dto.js"
 import { CreateSessionRequest } from "../../core/session/schema.js"
 import { SessionId } from "../../core/session/types.js"
-import { DockerError } from "../services/docker.js"
+import type { DockerError } from "../services/docker.js"
 import {
-  InvalidTransition,
-  type ManagerError,
-  PortExhausted,
+  type InvalidTransition,
+  type PortExhausted,
   type SessionManager,
   SessionManagerTag
 } from "../services/manager.js"
@@ -33,16 +32,15 @@ const refineId = (raw: string | undefined): Effect.Effect<SessionId> =>
       Match.exhaustive
     )
 
-const renderError = (
-  e: SessionNotFound | PortExhausted | InvalidTransition | DockerError
-): Effect.Effect<HttpServerResponse.HttpServerResponse> =>
-  Match.value(e).pipe(
-    Match.tag("SessionNotFound", () => errorJson(404, "session not found")),
-    Match.tag("PortExhausted", () => errorJson(503, "port range exhausted")),
-    Match.tag("InvalidTransition", (it) => errorJson(409, it.reason)),
-    Match.tag("DockerError", (de) => errorJson(502, `docker ${de.stage} failed`)),
-    Match.exhaustive
-  )
+const onSessionNotFound = (): Effect.Effect<HttpServerResponse.HttpServerResponse> =>
+  errorJson(404, "session not found")
+const onPortExhausted = (): Effect.Effect<HttpServerResponse.HttpServerResponse> =>
+  errorJson(503, "port range exhausted")
+const onInvalidTransition = (it: InvalidTransition): Effect.Effect<HttpServerResponse.HttpServerResponse> =>
+  errorJson(409, it.reason)
+const onDockerError = (de: DockerError): Effect.Effect<HttpServerResponse.HttpServerResponse> =>
+  errorJson(502, `docker ${de.stage} failed`)
+const onBadBody = (): Effect.Effect<HttpServerResponse.HttpServerResponse> => errorJson(400, "invalid request body")
 
 const withIdAndManager = <A, E>(
   op: (manager: SessionManager, id: SessionId) => Effect.Effect<A, E>
@@ -55,8 +53,20 @@ const withIdAndManager = <A, E>(
   })
 
 const handleSessionResult = <R>(
-  eff: Effect.Effect<HttpServerResponse.HttpServerResponse, SessionNotFound | ManagerError, R>
-) => eff.pipe(Effect.catchAll(renderError))
+  eff: Effect.Effect<
+    HttpServerResponse.HttpServerResponse,
+    SessionNotFound | PortExhausted | InvalidTransition | DockerError,
+    R
+  >
+) =>
+  eff.pipe(
+    Effect.catchTags({
+      SessionNotFound: onSessionNotFound,
+      PortExhausted: onPortExhausted,
+      InvalidTransition: onInvalidTransition,
+      DockerError: onDockerError
+    })
+  )
 
 const post = HttpRouter.post(
   "/api/sessions",
@@ -66,11 +76,12 @@ const post = HttpRouter.post(
     const session = yield* _(manager.create(input))
     return yield* _(okJson(toDto(session), 201))
   }).pipe(
-    Effect.catchAll((err) => {
-      if (err instanceof PortExhausted || err instanceof InvalidTransition || err instanceof DockerError) {
-        return renderError(err)
-      }
-      return errorJson(400, "invalid request body")
+    Effect.catchTags({
+      PortExhausted: onPortExhausted,
+      InvalidTransition: onInvalidTransition,
+      DockerError: onDockerError,
+      ParseError: onBadBody,
+      RequestError: onBadBody
     })
   )
 )

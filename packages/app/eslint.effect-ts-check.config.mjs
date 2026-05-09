@@ -216,5 +216,20 @@ export default tseslint.config(
     rules: {
       "no-restricted-syntax": ["error", ...restrictedSyntaxBaseNoServiceFactory]
     }
+  },
+  {
+    name: "effect-ts-compliance-bootstrap",
+    files: ["src/app/main.ts"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        paths: restrictedImports.filter((rule) => rule.name !== "node:http"),
+        patterns: [
+          {
+            group: ["node:fs", "node:fs/*", "node:path", "node:path/*", "node:child_process", "node:process"],
+            message: "Use @effect/platform services instead of node:* directly."
+          }
+        ]
+      }]
+    }
   }
 )

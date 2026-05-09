@@ -85,12 +85,12 @@ export const applyTransition = (
 ): TransitionResult & { readonly session?: Session } => {
   const result = nextStatus(session.status, event)
   return Match.value(result).pipe(
-    Match.when({ _tag: "Ok" }, ({ next }) => ({
-      _tag: "Ok" as const,
+    Match.when({ _tag: "Ok" }, ({ next }): TransitionResult & { readonly session?: Session } => ({
+      _tag: "Ok",
       next,
       session: withStoppedAt(session, event, next, now)
     })),
-    Match.when({ _tag: "Reject" }, (r) => r),
+    Match.when({ _tag: "Reject" }, (r): TransitionResult & { readonly session?: Session } => r),
     Match.exhaustive
   )
 }

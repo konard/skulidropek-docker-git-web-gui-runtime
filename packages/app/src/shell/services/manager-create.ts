@@ -16,7 +16,7 @@ import type { CreateDeps } from "./manager-deps.js"
 import { transitionAndStore } from "./manager-shared.js"
 import { type ManagerError, PortExhausted } from "./manager.js"
 
-const PORT_RANGE = { min: 16_080, max: 16_999 } as const
+const PORT_RANGE: { readonly min: number; readonly max: number } = { min: 16_080, max: 16_999 }
 
 const allocate = (
   deps: Pick<CreateDeps, "store">
