@@ -9,10 +9,15 @@ APP_DIR="$ROOT_DIR/packages/app"
 PORT="${PORT:-18080}"
 IMAGE="${IMAGE:-webx11-runtime:latest}"
 APP="${START_APP:-xeyes}"
+APP_COMMAND_NAME="${APP%% *}"
+APP_COMMAND_NAME="${APP_COMMAND_NAME##*/}"
+SESSION_NAME="${SESSION_NAME:-real-${APP_COMMAND_NAME}}"
 TMP_DIR="${TMP_DIR:-$(mktemp -d)}"
 SERVER_LOG="$TMP_DIR/server.log"
 SESSION_ID=""
 SERVER_PID=""
+
+mkdir -p "$TMP_DIR"
 
 cleanup() {
   if [ "${KEEP_ALIVE:-0}" = "1" ]; then
@@ -49,7 +54,11 @@ json_field() {
 trap cleanup EXIT
 
 cd "$ROOT_DIR"
-docker build -t "$IMAGE" docker
+if [ "${SKIP_BUILD:-0}" = "1" ]; then
+  printf '[real-e2e] SKIP_BUILD=1; using existing image: %s\n' "$IMAGE"
+else
+  docker build -t "$IMAGE" docker
+fi
 corepack pnpm --filter @effect-template/app build
 
 cd "$APP_DIR"
@@ -58,7 +67,7 @@ SERVER_PID="$!"
 wait_http "http://127.0.0.1:${PORT}/api/sessions"
 
 BODY=$(cat <<JSON
-{"name":"real-${APP}","image":"${IMAGE}","app":"${APP}","resolution":{"width":1280,"height":720,"depth":24},"resources":{"cpus":1,"memoryMb":1024,"shmMb":256},"ttlSeconds":3600}
+{"name":"${SESSION_NAME}","image":"${IMAGE}","app":"${APP}","resolution":{"width":1280,"height":720,"depth":24},"resources":{"cpus":1,"memoryMb":1024,"shmMb":256},"ttlSeconds":3600}
 JSON
 )
 

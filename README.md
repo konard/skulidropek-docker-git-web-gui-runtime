@@ -76,6 +76,11 @@ Docker layer used by unit tests:
 
 ![noVNC connected through the orchestrator gateway](docs/screenshots/real-orchestrator-novnc.png)
 
+The same flow also supports a heavier GUI app such as VS Code, using an
+optional proof image layered on top of the base runtime:
+
+![VS Code connected through the orchestrator gateway](docs/screenshots/real-vscode-novnc.png)
+
 To reproduce the same flow locally:
 
 ```sh
@@ -83,6 +88,9 @@ packages/app/experiments/real-e2e.sh
 
 # keep the server/session alive for manual browser screenshots
 KEEP_ALIVE=1 packages/app/experiments/real-e2e.sh
+
+# build the optional VS Code image and run it through the same orchestrator
+packages/app/experiments/real-vscode-e2e.sh
 ```
 
 ## REST API
