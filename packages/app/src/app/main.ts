@@ -1,18 +1,40 @@
-import { NodeContext, NodeRuntime } from "@effect/platform-node"
-import { Effect, pipe } from "effect"
-
-import { program } from "./program.js"
-
-// CHANGE: run the program through the Node platform runtime with its layer
-// WHY: ensure effects execute under the platform runtime with proper teardown/logging behavior
-// QUOTE(TZ): "\u0414\u0430 \u0434\u0430\u0432\u0430\u0439 \u0442\u0430\u043a \u044d\u0442\u043e \u0431\u043e\u043b\u0435\u0435 \u043f\u0440\u0430\u0432\u0438\u043b\u044c\u043d\u0430\u044f \u0440\u0435\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u044f"
-// REF: user-2025-12-19-platform-node
-// SOURCE: https://effect.website/docs/platform/runtime/ "runMain helps you execute a main effect with built-in error handling, logging, and signal management."
-// FORMAT THEOREM: forall args in Argv: decode(args) = v -> runMain(program)
+// CHANGE: wire HTTP server with Docker session manager and platform-node runtime
+// WHY: ТЗ pins a single-process REST API + path-based gateway on one host
+// QUOTE(TZ): "Сервис со своим REST API ... POST/GET/DELETE /api/sessions ... GET /b/<id>/vnc.html"
+// REF: issue#1 sections 8, 9, 17
 // PURITY: SHELL
-// EFFECT: Effect<string, S.ParseError, Console>
-// INVARIANT: program executed with NodeContext.layer
+// EFFECT: Effect<never, ServeError | ConfigError, never> at runtime
+// INVARIANT: process exits cleanly on SIGINT/SIGTERM via NodeRuntime.runMain
 // COMPLEXITY: O(1)/O(1)
-const main = pipe(program, Effect.provide(NodeContext.layer))
+import { NodeContext, NodeHttpClient, NodeHttpServer, NodeRuntime } from "@effect/platform-node"
+import { Layer } from "effect"
+import { createServer } from "node:http"
 
-NodeRuntime.runMain(main)
+import { serverLayer } from "../shell/http/server.js"
+import { NowClockLayer } from "../shell/services/clock.js"
+import { DockerLayer } from "../shell/services/docker.js"
+import { IdGenLayer } from "../shell/services/id.js"
+import { SessionManagerLayer } from "../shell/services/manager.js"
+import { SessionStoreLayer } from "../shell/services/store.js"
+
+const port = Number(process.env["PORT"] ?? 8080)
+
+const HttpLayer = NodeHttpServer.layer(() => createServer(), { port })
+
+const ServicesLayer = Layer.mergeAll(
+  SessionStoreLayer,
+  DockerLayer,
+  IdGenLayer,
+  NowClockLayer
+)
+
+const ManagerLayer = SessionManagerLayer.pipe(Layer.provide(ServicesLayer))
+
+const AppLayer = serverLayer.pipe(
+  Layer.provide(HttpLayer),
+  Layer.provide(NodeHttpClient.layer),
+  Layer.provide(ManagerLayer),
+  Layer.provide(NodeContext.layer)
+)
+
+NodeRuntime.runMain(Layer.launch(AppLayer))
