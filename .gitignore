@@ -3,6 +3,9 @@ dist/
 build/
 coverage/
 packages/*/dist/
+packages/*/experiments/dist/
+**/__pycache__/
+ci-logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

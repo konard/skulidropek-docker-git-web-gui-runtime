@@ -1,0 +1,137 @@
+
+[1;36m=== 1) GET /api/sessions  (empty list) ===[0m
+[1;33m$ curl http://127.0.0.1:18080/api/sessions[0m
+[]
+
+[1;36m=== 2) POST /api/sessions  (create xterm session) ===[0m
+[1;33m$ curl -X POST http://127.0.0.1:18080/api/sessions -d '<json>'[0m
+{
+    "id": "e5a5d063e37b",
+    "name": "demo-xterm",
+    "status": "READY",
+    "viewer_url": "/b/e5a5d063e37b/vnc.html?autoconnect=true&resize=remote&path=b%2Fe5a5d063e37b%2Fwebsockify",
+    "novnc_port": 16080,
+    "container_id": "fake-container-000000000001",
+    "created_at": "2026-05-09T17:13:52.129Z",
+    "updated_at": "2026-05-09T17:13:52.130Z",
+    "expires_at": "2026-05-09T18:13:52.129Z",
+    "stopped_at": null,
+    "failure_reason": null
+}
+
+[1;36m=== 3) POST /api/sessions  (create xeyes session) ===[0m
+[1;33m$ curl -X POST http://127.0.0.1:18080/api/sessions -d '<json>'[0m
+{
+    "id": "396ac8df9ced",
+    "name": "demo-xeyes",
+    "status": "READY",
+    "viewer_url": "/b/396ac8df9ced/vnc.html?autoconnect=true&resize=remote&path=b%2F396ac8df9ced%2Fwebsockify",
+    "novnc_port": 16081,
+    "container_id": "fake-container-000000000002",
+    "created_at": "2026-05-09T17:13:52.350Z",
+    "updated_at": "2026-05-09T17:13:52.350Z",
+    "expires_at": "2026-05-09T18:13:52.350Z",
+    "stopped_at": null,
+    "failure_reason": null
+}
+
+[1;36m=== 4) GET /api/sessions  (list contains both) ===[0m
+[1;33m$ curl http://127.0.0.1:18080/api/sessions[0m
+{
+  "id": "e5a5d063e37b",
+  "name": "demo-xterm",
+  "status": "READY",
+  "novnc_port": 16080,
+  "viewer_url": "/b/e5a5d063e37b/vnc.html?autoconnect=true&resize=remote&path=b%2Fe5a5d063e37b%2Fwebsockify"
+}
+{
+  "id": "396ac8df9ced",
+  "name": "demo-xeyes",
+  "status": "READY",
+  "novnc_port": 16081,
+  "viewer_url": "/b/396ac8df9ced/vnc.html?autoconnect=true&resize=remote&path=b%2F396ac8df9ced%2Fwebsockify"
+}
+
+[1;36m=== 5) GET /api/sessions/e5a5d063e37b  (single session) ===[0m
+[1;33m$ curl http://127.0.0.1:18080/api/sessions/e5a5d063e37b[0m
+{
+    "id": "e5a5d063e37b",
+    "name": "demo-xterm",
+    "status": "READY",
+    "viewer_url": "/b/e5a5d063e37b/vnc.html?autoconnect=true&resize=remote&path=b%2Fe5a5d063e37b%2Fwebsockify",
+    "novnc_port": 16080,
+    "container_id": "fake-container-000000000001",
+    "created_at": "2026-05-09T17:13:52.129Z",
+    "updated_at": "2026-05-09T17:13:52.130Z",
+    "expires_at": "2026-05-09T18:13:52.129Z",
+    "stopped_at": null,
+    "failure_reason": null
+}
+
+[1;36m=== 6) GET /api/sessions/e5a5d063e37b/logs  (container logs) ===[0m
+[1;33m$ curl http://127.0.0.1:18080/api/sessions/e5a5d063e37b/logs[0m
+{
+    "lines": [
+        "[runtime] Starting Xvfb on :99 (1280x720x24)",
+        "[runtime] Starting window manager (openbox)",
+        "[runtime] Starting app: xterm",
+        "[runtime] Starting x11vnc on 127.0.0.1:5900",
+        "[runtime] Starting websockify/noVNC on 0.0.0.0:6080",
+        "[runtime] Ready"
+    ]
+}
+
+[1;36m=== 7) GET /b/e5a5d063e37b/vnc.html  (gateway proxy: 502 because the fake noVNC port has no upstream) ===[0m
+[1;33m$ curl -i http://127.0.0.1:18080/b/e5a5d063e37b/vnc.html[0m
+HTTP/1.1 502 Bad Gateway
+content-type: application/json
+content-length: 32
+Date: Sat, 09 May 2026 17:13:52 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"upstream proxy error"}
+[1;36m=== 8) GET /b/unknown123456/vnc.html  (unknown session → 404) ===[0m
+[1;33m$ curl -i http://127.0.0.1:18080/b/unknown123456/vnc.html[0m
+HTTP/1.1 404 Not Found
+content-type: application/json
+content-length: 29
+Date: Sat, 09 May 2026 17:13:52 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"session not found"}
+[1;36m=== 9) GET /api/sessions/00000000dead  (unknown id → 404) ===[0m
+[1;33m$ curl -i http://127.0.0.1:18080/api/sessions/00000000dead[0m
+HTTP/1.1 404 Not Found
+content-type: application/json
+content-length: 29
+Date: Sat, 09 May 2026 17:13:52 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"session not found"}
+[1;36m=== 10) DELETE /api/sessions/396ac8df9ced  (FSM rejects: READY→DELETE invalid; status 409) ===[0m
+[1;33m$ curl -i -X DELETE http://127.0.0.1:18080/api/sessions/396ac8df9ced[0m
+HTTP/1.1 409 Conflict
+content-type: application/json
+content-length: 35
+Date: Sat, 09 May 2026 17:13:52 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"Delete invalid in READY"}
+[1;36m=== 11) GET /api/sessions  (final list — both still READY) ===[0m
+[1;33m$ curl http://127.0.0.1:18080/api/sessions[0m
+{
+  "id": "e5a5d063e37b",
+  "name": "demo-xterm",
+  "status": "READY"
+}
+{
+  "id": "396ac8df9ced",
+  "name": "demo-xeyes",
+  "status": "READY"
+}
+
+[1;36m=== DONE — REST API and gateway both reachable on a single port ===[0m
