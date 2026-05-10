@@ -8,11 +8,14 @@
 // COMPLEXITY: O(1)/O(1) per handler (excluding manager work)
 import type { HttpServerResponse } from "@effect/platform"
 import { HttpRouter, HttpServerRequest } from "@effect/platform"
-import { Effect, Match } from "effect"
+import { Effect, Match, Option } from "effect"
 
 import { toDto } from "../../core/session/dto.js"
 import { CreateSessionRequest } from "../../core/session/schema.js"
 import { SessionId } from "../../core/session/types.js"
+import { findWorkspaceOption, listWorkspaceOptions, resolveWorkspaceLaunch } from "../../core/workspace/catalog.js"
+import { toWorkspaceOptionDto } from "../../core/workspace/dto.js"
+import { LaunchWorkspaceRequest } from "../../core/workspace/schema.js"
 import type { DockerError } from "../services/docker.js"
 import {
   type InvalidTransition,
@@ -41,6 +44,8 @@ const onInvalidTransition = (it: InvalidTransition): Effect.Effect<HttpServerRes
 const onDockerError = (de: DockerError): Effect.Effect<HttpServerResponse.HttpServerResponse> =>
   errorJson(502, `docker ${de.stage} failed`)
 const onBadBody = (): Effect.Effect<HttpServerResponse.HttpServerResponse> => errorJson(400, "invalid request body")
+const onWorkspaceNotFound = (): Effect.Effect<HttpServerResponse.HttpServerResponse> =>
+  errorJson(404, "workspace not found")
 
 const withIdAndManager = <A, E>(
   op: (manager: SessionManager, id: SessionId) => Effect.Effect<A, E>
@@ -86,6 +91,67 @@ const post = HttpRouter.post(
   )
 )
 
+const listWorkspaces = HttpRouter.get(
+  "/api/workspaces",
+  okJson({ workspaces: listWorkspaceOptions().map((option) => toWorkspaceOptionDto(option)) })
+)
+
+const getWorkspace = HttpRouter.get(
+  "/api/workspaces/:workspaceId",
+  Effect.gen(function*(_) {
+    const params = yield* _(HttpRouter.params)
+    const workspaceId = params["workspaceId"] ?? ""
+    return yield* _(
+      Option.match(findWorkspaceOption(workspaceId), {
+        onNone: onWorkspaceNotFound,
+        onSome: (option) => okJson(toWorkspaceOptionDto(option))
+      })
+    )
+  })
+)
+
+const postWorkspaceSession = HttpRouter.post(
+  "/api/workspaces/:workspaceId/sessions",
+  Effect.gen(function*(_) {
+    const params = yield* _(HttpRouter.params)
+    const workspaceId = params["workspaceId"] ?? ""
+    const input = yield* _(HttpServerRequest.schemaBodyJson(LaunchWorkspaceRequest))
+    const manager = yield* _(SessionManagerTag)
+    return yield* _(
+      Option.match(findWorkspaceOption(workspaceId), {
+        onNone: onWorkspaceNotFound,
+        onSome: (option) =>
+          Option.match(resolveWorkspaceLaunch(option, input), {
+            onNone: () =>
+              errorJson(501, "workspace requires setup before launch", {
+                workspace_id: option.id,
+                availability: option.availability,
+                launch_status: option.launchStatus,
+                launch_surface: option.launchSurface,
+                backend: option.backend,
+                requirements: option.requirements,
+                kasm: option.kasm ?? null
+              }),
+            onSome: (sessionInput) =>
+              manager.create(sessionInput).pipe(
+                Effect.flatMap((session) => okJson(toDto(session), 201)),
+                Effect.catchTags({
+                  PortExhausted: onPortExhausted,
+                  InvalidTransition: onInvalidTransition,
+                  DockerError: onDockerError
+                })
+              )
+          })
+      })
+    )
+  }).pipe(
+    Effect.catchTags({
+      ParseError: onBadBody,
+      RequestError: onBadBody
+    })
+  )
+)
+
 const list = HttpRouter.get(
   "/api/sessions",
   Effect.gen(function*(_) {
@@ -115,4 +181,14 @@ const logs = HttpRouter.get(
   handleSessionResult(withIdAndManager((m, id) => m.logs(id).pipe(Effect.flatMap((lines) => okJson({ lines })))))
 )
 
-export const apiRouter = HttpRouter.empty.pipe(post, list, get, stop, remove, logs)
+export const apiRouter = HttpRouter.empty.pipe(
+  listWorkspaces,
+  getWorkspace,
+  postWorkspaceSession,
+  post,
+  list,
+  get,
+  stop,
+  remove,
+  logs
+)

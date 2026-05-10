@@ -6,7 +6,7 @@
 // EFFECT: Effect<Session, ManagerError, never>
 // INVARIANT: returned session has containerId !== null and status === "READY"
 // COMPLEXITY: O(|range|)/O(1)
-import { Effect, Option } from "effect"
+import { Effect, Option, Schedule } from "effect"
 
 import { buildDockerRunArgs } from "../../core/session/docker-args.js"
 import { createSession, type CreateSessionInput } from "../../core/session/factory.js"
@@ -16,7 +16,8 @@ import type { CreateDeps } from "./manager-deps.js"
 import { transitionAndStore } from "./manager-shared.js"
 import { type ManagerError, PortExhausted } from "./manager.js"
 
-const PORT_RANGE: { readonly min: number; readonly max: number } = { min: 16_080, max: 16_999 }
+const PORT_RANGE: { readonly min: number; readonly max: number } = { min: 16_100, max: 16_999 }
+const INSPECT_RETRY = Schedule.spaced("100 millis").pipe(Schedule.intersect(Schedule.recurs(10)))
 
 const allocate = (
   deps: Pick<CreateDeps, "store">
@@ -27,6 +28,15 @@ const allocate = (
       onSome: (p) => Effect.succeed(p)
     })
   ))
+
+const markCreateFailed = (
+  deps: Pick<CreateDeps, "store" | "clock">,
+  session: Session,
+  stage: string
+): Effect.Effect<void> =>
+  transitionAndStore(deps, session, { _tag: "Fail", reason: `docker ${stage} failed` }).pipe(
+    Effect.ignore
+  )
 
 export const createOp = (
   deps: CreateDeps,
@@ -40,10 +50,20 @@ export const createOp = (
     yield* _(deps.store.put(initial))
     const starting = yield* _(transitionAndStore(deps, initial, { _tag: "Start" }))
     const argv = buildDockerRunArgs(starting, port, {})
-    const containerId = yield* _(deps.docker.run(argv))
+    const containerId = yield* _(
+      deps.docker.run(argv).pipe(
+        Effect.tapError((err) => markCreateFailed(deps, starting, err.stage))
+      )
+    )
     const novncHost = yield* _(
       deps.docker.inspectIp(containerId).pipe(
-        Effect.tapError(() => deps.docker.rm(containerId).pipe(Effect.ignore))
+        Effect.retry(INSPECT_RETRY),
+        Effect.tapError((err) =>
+          deps.docker.rm(containerId).pipe(
+            Effect.ignore,
+            Effect.zipRight(markCreateFailed(deps, starting, err.stage))
+          )
+        )
       )
     )
     const withContainer = { ...starting, containerId, novncHost }

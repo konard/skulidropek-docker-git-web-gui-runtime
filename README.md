@@ -103,8 +103,57 @@ packages/app/experiments/real-vscode-e2e.sh
 | GET    | `/api/sessions/:id/logs`      | container logs `{ lines: [...] }`   |
 | POST   | `/api/sessions/:id/stop`      | drive STOPPING → STOPPED            |
 | DELETE | `/api/sessions/:id`           | requires STOPPED first; else 409    |
+| GET    | `/api/workspaces`             | selectable launch catalog           |
+| GET    | `/api/workspaces/:id`         | one launch option + requirements    |
+| POST   | `/api/workspaces/:id/sessions`| launch selected option or setup hint|
 | GET    | `/b/<session_id>/<sub>`       | gateway to in-container noVNC       |
 | WS     | `/b/<session_id>/websockify`  | proxied VNC stream                  |
+
+`/api/workspaces` exposes the options a client can render as a launcher:
+Web-X11 container presets, Kasm-compatible container images, Android/Redroid,
+Windows RDP, Windows RemoteApp, managed Windows VM and Wine strategies.
+
+Launchable Web-X11 presets can be started directly:
+
+```sh
+curl -sX POST http://localhost:8080/api/workspaces/xeyes/sessions \
+  -H 'content-type: application/json' \
+  -d '{ "name": "eyes" }'
+```
+
+Strategies that need external setup return `501` with `requirements`, for
+example Windows VM creation returns provider/image/license requirements instead
+of pretending that a Docker container can run Windows.
+
+### Kasm Android and Windows app tiles
+
+The Kasm dashboard can expose Android and Windows app testing as normal
+Workspaces:
+
+- `Android (Redroid)` uses `kasmweb/redroid:1.18.0` and requires host
+  `binder_linux` devices (`binder`, `hwbinder`, `vndbinder`).
+- `Windows Apps (Wine)` uses the custom image in `docker/kasm-wine` and persists
+  the user's Wine prefix and downloads through Kasm persistent profiles.
+
+Register and build the Wine/Android tiles on the Kasm host. On live Kasm hosts
+with aggressive image pruning, register the DB rows before pulling/building so
+the agent keeps these images:
+
+```sh
+DOCKER_HOST=tcp://host.docker.internal:2375 docker run --rm --privileged -v /mnt:/host-mnt ubuntu:24.04 \
+  sh -lc 'mkdir -p /host-mnt/kasm_profiles/android-redroid /host-mnt/kasm_profiles/windows-wine'
+
+DOCKER_HOST=tcp://host.docker.internal:2375 docker exec -i kasm_db \
+  psql -U kasmapp -d kasm < ops/kasm/register-android-wine-workspaces.sql
+
+DOCKER_HOST=tcp://host.docker.internal:2375 docker pull kasmweb/redroid:1.18.0
+DOCKER_HOST=tcp://host.docker.internal:2375 \
+  docker build -t docker-git-kasm-wine:1.18.0 docker/kasm-wine
+```
+
+After registration, log in to Kasm and open the tiles from the user dashboard.
+If Android fails to boot, check the host for `/dev/binder`, `/dev/hwbinder` and
+`/dev/vndbinder`; this kernel support is outside the container image.
 
 ## Security hardening (per ТЗ §11)
 
@@ -124,10 +173,10 @@ test in `packages/app/tests/core/session/docker-args.test.ts`.
 
 ```sh
 cd packages/app
-pnpm run lint        # vibecode-linter (eslint + biome + tsc + jscpd) on src/
-pnpm run lint:tests  # same on tests/
-pnpm run test        # 110 vitest cases, CORE pure + SHELL with fake Docker
-pnpm run typecheck   # tsc --noEmit
+corepack pnpm run lint        # vibecode-linter (eslint + biome + tsc + jscpd) on src/
+corepack pnpm run lint:tests  # same on tests/
+corepack pnpm exec vitest run # 119 vitest cases, CORE pure + SHELL with fake Docker
+corepack pnpm run typecheck   # tsc --noEmit
 ```
 
 ## Layout

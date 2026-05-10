@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Install Windows App
+Comment=Run EXE or MSI files with Wine
+Exec=/usr/local/bin/windows-app-launcher
+Icon=applications-other
+Terminal=false
+Categories=Utility;

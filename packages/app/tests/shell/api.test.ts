@@ -27,6 +27,17 @@ interface LogsDto {
   readonly lines: ReadonlyArray<string>
 }
 
+interface WorkspaceListDto {
+  readonly workspaces: ReadonlyArray<{
+    readonly id: string
+    readonly availability: string
+    readonly launch_status: string
+    readonly launch_surface: string
+    readonly launch_url: string
+    readonly kasm: { readonly friendlyName: string; readonly dockerImage: string } | null
+  }>
+}
+
 const app = HttpApp.toWebHandlerLayer(apiRouter, makeFreshManagerLayer())
 
 afterAll(() => Effect.runPromise(Effect.promise(() => app.dispose())))
@@ -45,6 +56,17 @@ const post = (body: object) =>
 const postPath = (path: string) =>
   Effect.promise(() => app.handler(new Request(`https://t${path}`, { method: "POST" })))
 
+const postWorkspace = (id: string, body: object) =>
+  Effect.promise(() =>
+    app.handler(
+      new Request(`https://t/api/workspaces/${id}/sessions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+      })
+    )
+  )
+
 const get = (path: string) => Effect.promise(() => app.handler(new Request(`https://t${path}`)))
 const del = (path: string) => Effect.promise(() => app.handler(new Request(`https://t${path}`, { method: "DELETE" })))
 
@@ -52,6 +74,15 @@ const readJson = <A>(res: Response): Effect.Effect<A> =>
   Effect.promise(() => res.text()).pipe(Effect.map((t) => JSON.parse(t) as A))
 
 const createSession = Effect.flatMap(post(validCreatePayload), (res) => readJson<SessionDto>(res))
+
+const expectReadyCreated = (res: Response): Effect.Effect<SessionDto> =>
+  Effect.gen(function*(_) {
+    expect(res.status).toBe(201)
+    const dto = yield* _(readJson<SessionDto>(res))
+    expect(dto.id).toBe(FIXED_ID)
+    expect(dto.status).toBe("READY")
+    return dto
+  })
 
 const expectStatus = (res: Response, status: number): Effect.Effect<void> =>
   Effect.sync(() => {
@@ -63,10 +94,7 @@ describe("POST /api/sessions", () => {
     Effect.runPromise(
       Effect.gen(function*(_) {
         const res = yield* _(post(validCreatePayload))
-        expect(res.status).toBe(201)
-        const dto = yield* _(readJson<SessionDto>(res))
-        expect(dto.id).toBe(FIXED_ID)
-        expect(dto.status).toBe("READY")
+        const dto = yield* _(expectReadyCreated(res))
         expect(dto.viewer_url.startsWith(`/b/${FIXED_ID}/vnc.html`)).toBe(true)
         expect(dto.container_id).toBe(FIXED_CONTAINER)
       })
@@ -77,6 +105,59 @@ describe("POST /api/sessions", () => {
       Effect.gen(function*(_) {
         const res = yield* _(post({ ...validCreatePayload, name: "" }))
         expect(res.status).toBe(400)
+      })
+    ))
+})
+
+describe("GET /api/workspaces", () => {
+  it("returns selectable workspace settings", () =>
+    Effect.runPromise(
+      Effect.gen(function*(_) {
+        const res = yield* _(get("/api/workspaces"))
+        expect(res.status).toBe(200)
+        const body = yield* _(readJson<WorkspaceListDto>(res))
+        const ids = body.workspaces.map((workspace) => workspace.id)
+        expect(ids).toContain("visual-studio-code")
+        expect(ids).toContain("android-redroid")
+        expect(ids).toContain("windows-vm-create")
+        const android = body.workspaces.find((workspace) => workspace.id === "android-redroid")
+        expect(android?.launch_surface).toBe("kasm-ui")
+        expect(android?.kasm?.dockerImage).toBe("kasmweb/redroid:1.18.0")
+      })
+    ))
+
+  it("returns one workspace by id", () =>
+    Effect.runPromise(
+      Effect.gen(function*(_) {
+        const res = yield* _(get("/api/workspaces/windows-remoteapp"))
+        expect(res.status).toBe(200)
+        const body = yield* _(
+          readJson<{ readonly availability: string; readonly launch_surface: string; readonly launch_url: string }>(res)
+        )
+        expect(body.availability).toBe("requires-setup")
+        expect(body.launch_surface).toBe("external")
+        expect(body.launch_url).toBe("/api/workspaces/windows-remoteapp/sessions")
+      })
+    ))
+})
+
+describe("POST /api/workspaces/:id/sessions", () => {
+  it("launches a Web-X11 preset", () =>
+    Effect.runPromise(
+      Effect.gen(function*(_) {
+        const res = yield* _(postWorkspace("xeyes", { name: "eyes" }))
+        yield* _(expectReadyCreated(res))
+      })
+    ))
+
+  it("returns setup requirements for Windows VM strategy", () =>
+    Effect.runPromise(
+      Effect.gen(function*(_) {
+        const res = yield* _(postWorkspace("windows-vm-create", {}))
+        expect(res.status).toBe(501)
+        const body = yield* _(readJson<ErrorDto & { readonly launch_surface: string }>(res))
+        expect(body.error).toBe("workspace requires setup before launch")
+        expect(body.launch_surface).toBe("external")
       })
     ))
 })

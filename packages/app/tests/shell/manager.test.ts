@@ -142,6 +142,23 @@ describe("SessionManager error paths", () => {
       expect(result._tag).toBe("DockerError")
     }))
 
+  it("marks the stored session FAILED when docker inspect fails", () =>
+    runWithCalls(
+      (m) =>
+        Effect.gen(function*(_) {
+          const error = yield* _(m.create(baseInput).pipe(Effect.flip))
+          const sessions = yield* _(m.list)
+          return { error, sessions }
+        }),
+      [FIXED_ID],
+      { inspectIp: () => Effect.fail(new DockerError({ stage: "inspect", cause: "boom" })) }
+    ).then(({ calls, result }) => {
+      expect(result.error._tag).toBe("DockerError")
+      expect(result.sessions[0]?.status).toBe("FAILED")
+      expect(result.sessions[0]?.failureReason).toBe("docker inspect failed")
+      expect(calls.rm).toEqual([FIXED_CONTAINER])
+    }))
+
   it("rejects re-stopping a STOPPED session via InvalidTransition", () =>
     runWithCalls((m) =>
       Effect.gen(function*(_) {

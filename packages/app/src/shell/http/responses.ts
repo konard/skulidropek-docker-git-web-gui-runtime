@@ -9,8 +9,12 @@
 import { HttpServerResponse } from "@effect/platform"
 import { Effect } from "effect"
 
-export const errorJson = (status: number, message: string) =>
-  HttpServerResponse.json({ error: message }, { status }).pipe(
+export const errorJson = (
+  status: number,
+  message: string,
+  extra: object = {}
+) =>
+  HttpServerResponse.json({ error: message, ...extra }, { status }).pipe(
     Effect.orElseSucceed(() => HttpServerResponse.text(message, { status }))
   )
 
